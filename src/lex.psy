@@ -167,17 +167,18 @@ string_table_setup ::= func( -> v0)
 
 comment_table_setup ::= func( -> v0)
 {
-	// the '/' char in main table will yield operator_fslash
+	putzstr("1");
 	// we need to point that entry's next to the comment table
 	slash_entry ::= (main_table.tbl) # 47;
-	nexttbl ::= (slash_entry->next)@lex_table?;
-	deref((nexttbl->tbl) # 47) = lex_entry
+	putzstr("2");
+	deref(slash_entry) = lex_entry
 	{
 		.tag := lex_entry_tag.none;
 		.data := zero;
 		.metadata := zero;
 		.next := (ref comment_table)@v0?;
 	};
+	putzstr("3");
 
 	i : u64 mut;
 	for(i = 0, i < 255, i = i + 1)
@@ -649,25 +650,42 @@ lex_install ::= func(t : lex_token, front_identifier : u8?, break : lex_break_ty
 
 lex_setup ::= func(-> v0)
 {
+	putzstr("A");
 	main_table_setup(ref main_table);
+	putzstr("B");
 	string_table_setup();
+	putzstr("C");
 	decimal_table_setup();
+	putzstr("D");
 	hex_table_setup();
+	putzstr("E");
 	binary_table_setup();
+	putzstr("F");
 
 	everything ::= (lex_break_type.everything);
 	//ls_table_set_fn(ref main_table, '_', testfn);
+	putzstr("G");
 	lex_install(lex_token.colon, ":", everything | (lex_break_type.not_equals_symbol));
+	putzstr("H");
 	lex_install(lex_token.comma, ",", zero);
+	putzstr("I");
 	lex_install(lex_token.obrace, "{", zero);
+	putzstr("J");
 	lex_install(lex_token.cbrace, "}", zero);
+	putzstr("K");
 	lex_install(lex_token.obrack, "[", zero);
+	putzstr("L");
 	lex_install(lex_token.cbrack, "]", zero);
+	putzstr("M");
 	lex_install(lex_token.keyword_true, "true", lex_break_type.punctuation_or_whitespace);
+	putzstr("N");
 	lex_install(lex_token.keyword_false, "false", lex_break_type.punctuation_or_whitespace);
+	putzstr("O");
 	lex_install(lex_token.keyword_null, "null", lex_break_type.punctuation_or_whitespace);
+	putzstr("P");
 
 	comment_table_setup();
+	putzstr("Q");
 };
 
 ls_verbose_print ::= func(s : lex_state? -> v0)
