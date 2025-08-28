@@ -1,0 +1,3 @@
+[submodule "psystdlib"]
+	path = psystdlib
+	url = https://github.com/harrand/psystdlib

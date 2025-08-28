@@ -1,0 +1,35 @@
+== default ==
+{
+	add_source_directory("src");
+	add_build_file("psystdlib/stdlib.psy", _config);
+}
+
+global_arena_val : arena mut;
+global_arena : arena mut? mut;
+
+frame_arena_val : arena mut;
+frame_arena : arena mut? mut;
+
+setup_arenas ::= func( -> v0)
+{
+	global_arena_val = arena_create(4096 * 1024);
+	global_arena = ref global_arena_val;
+
+	frame_arena_val = arena_create(4096 * 1024);
+	frame_arena = ref frame_arena_val;
+};
+
+destroy_arenas ::= func( -> v0)
+{
+	putzstr("arena free: ");
+	putuint(global_arena_val.cur);
+	putzstr("B");
+	putchar(10);
+	arena_destroy(ref global_arena_val);
+	arena_destroy(ref frame_arena_val);
+};
+
+main ::= func(argc : s32, argv : u8??, envp : u8?? -> s32)
+{
+	return 0;
+};
