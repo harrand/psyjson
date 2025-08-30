@@ -1,0 +1,66 @@
+parse_state ::= struct
+{
+	nodes : json_data mut?;
+	nodes_size : u64;
+	nodes_cap : u64;
+	internal : internal_parse_state mut;
+};
+
+internal_parse_state ::= struct
+{
+	stash : json_data mut?;
+	stash_size : u64;
+	stash_cap : u64;
+
+	lex_cursor : u64;
+};
+
+stash_pop ::= func(i : internal_parse_state mut? -> json_data)
+{
+	if(i->stash_size == 0)
+	{
+		putzstr("stash_pop on empty stash");
+		__debugbreak();
+	}
+	stashlast ::= deref(i->stash # ((i->stash_size) - 1));
+	i->stash_size = (i->stash_size) - 1;
+	return stashlast;
+};
+
+parse_one ::= func(l : lex_state, s : parse_state mut? -> v0)
+{
+	i ::= ref(s->internal);
+	token ::= deref(l.tokens # (i->lex_cursor));
+	if(token.tok == lex_token.obrace)
+	{
+		// start of a new object. snore
+		// make an object json_data that is empty and shove it into the stash.
+	}
+	if(token.tok == lex_token.cbrace)
+	{
+		// end of an object.
+		// take it off of the stash
+		obj ::= stash_pop(i);
+		// if the stash is now empty then we have a top-level object. just add it to parse_state.nodes
+		// if stash is not empty then this is a subobject. add it as a child to that instead.
+	}
+};
+
+parse ::= func(l : lex_state, verbose_parse : bool -> parse_state)
+{
+	i : u64 mut;
+
+	ret ::= zero@parse_state mut;
+	while(ret.internal.lex_cursor < (l.tokens_size))
+	{
+		parse_one(l, ref ret);
+	}
+	if(verbose_parse)
+	{
+		for(i = 0, i < (ret.nodes_size), i = i + 1)
+		{
+			json_data_verbose_print(deref(ret.nodes # i), 0);
+		}
+	}
+	return ret;
+};

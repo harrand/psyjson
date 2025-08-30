@@ -1,0 +1,59 @@
+json_data_type ::= enum
+{
+	.string_literal := 0;
+	.numeric_literal := 1;
+	.bool_literal := 2;
+	.null_literal := 3;
+	.array := 4;
+	.object := 5;
+};
+
+json_data ::= struct
+{
+	type : json_data_type;
+	number : u64;
+	boolean : bool;
+	chars : u8?;
+	chars_len : u64;
+
+	children : v0?;
+	childcap : u64;
+	childcount : u64;
+
+	loc : srcloc;
+};
+
+json_data_add_child ::= func(n : json_data mut?, c : json_data, a : arena mut? -> json_data mut?)
+{
+	if(n->children == zero)
+	{
+		n->childcap = 8;
+		n->children = arena_alloc(a, __sizeof(json_data) * (n->childcap));
+	}
+	while(n->childcount >= (n->childcap))
+	{
+		oldcap ::= n->childcap;
+		olddata ::= n->children;
+		n->childcap = (n->childcap * 2);
+		n->children = arena_alloc(a, __sizeof(json_data) * (n->childcap));
+		memcopy(n->children, olddata, __sizeof(json_data) * oldcap);
+	}
+	ptr ::= (n->children)@json_data mut? mut;
+	ptr = (ptr#(n->childcount));
+	n->childcount = (n->childcount + 1);
+	deref(ptr) = c;
+	return ptr;
+};
+
+json_data_verbose_print ::= func(j : json_data, tabcount : u64 -> v0)
+{
+	i : u64 mut;
+	for(i = 0, i < tabcount, i = i + 1)
+	{
+		putchar(9);
+	}
+	putzstr(__enumname(j.type));
+	putzstr(" ");
+	putloc(j.loc);
+	putchar(10);
+};

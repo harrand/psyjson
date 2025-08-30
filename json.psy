@@ -83,6 +83,8 @@ main ::= func(iargc : s32, iargv : u8??, ienvp : u8?? -> s32)
 		__debugbreak();
 	}
 	source ::= fully_read_file(args.file, global_arena);
-	state ::= lex(args.file, source, true, global_arena);
+	tokens ::= lex(args.file, source, false, global_arena);
+	json ::= parse(tokens, true);
+	
 	return 0;
 };
