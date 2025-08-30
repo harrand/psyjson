@@ -62,14 +62,27 @@ fully_read_file ::= func(path : u8?, a : arena mut? -> u8 mut?)
 	return data;
 };
 
-main ::= func(argc : s32, argv : u8??, envp : u8?? -> s32)
+argc : s32 mut;
+argv : u8?? mut;
+envp : u8?? mut;
+
+main ::= func(iargc : s32, iargv : u8??, ienvp : u8?? -> s32)
 {
+	argc = iargc;
+	argv = iargv;
+	envp = ienvp;
 	setup_arenas();
 	defer destroy_arenas();
-	lex_setup();
+	lex_setup(global_arena);
 
-	path ::= "build/example.json";
-	source ::= fully_read_file(path, global_arena);
-	state ::= lex(path, source, true);
+	args ::= json_parse_args(global_arena);
+	if(args.file == zero)
+	{
+		putzstr("error: no file provided");
+		putchar(10);
+		__debugbreak();
+	}
+	source ::= fully_read_file(args.file, global_arena);
+	state ::= lex(args.file, source, true, global_arena);
 	return 0;
 };

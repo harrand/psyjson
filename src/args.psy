@@ -1,0 +1,44 @@
+json_compile_args ::= struct
+{
+	file : u8?;
+};
+
+json_parse_args ::= func(a : arena mut? -> json_compile_args)
+{
+	ret : json_compile_args mut := zero@json_compile_args;
+
+	i : s32 mut;
+	for(i = 1, i < argc, i = i + 1)
+	{
+		curarg ::= deref(argv # i);
+		isopt ::= zstr_starts_with(curarg, "-");
+		if(!isopt)
+		{
+			// must be a build file then.
+			if((ret.file) != zero)
+			{
+				putzstr("specified second json file ");
+				putchar('"');
+				putzstr(curarg);
+				putchar('"');
+				putzstr(" after initial json file ");
+				putchar('"');
+				putzstr(ret.file);
+				putchar('"');
+				putzstr(". you can only specify a single json file");
+				__debugbreak();
+			}
+			(ret.file) = curarg;
+		}
+		if(isopt)
+		{
+			nextarg ::= argv # (i + 1);
+			//if(zstreql(curarg, "--verbose-lex"))
+			//{
+			//	(ret.verbose_lex) = true;
+			//}
+		}
+	}
+
+	return ret;
+};

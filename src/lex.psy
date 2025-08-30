@@ -459,9 +459,9 @@ ls_current_loc ::= func(s : lex_state? -> srcloc)
 	};
 };
 
-lex_newtable ::= func( -> lex_table mut?)
+lex_newtable ::= func(a : arena mut? -> lex_table mut?)
 {
-	ret : lex_table mut? := arena_alloc(global_arena, __sizeof(lex_table));
+	ret : lex_table mut? := arena_alloc(a, __sizeof(lex_table));
 	memfill(ret, 0, __sizeof(lex_table));
 	return ret;
 };
@@ -541,7 +541,7 @@ matches_break_type ::= func(break : lex_break_type, ch : u8 -> bool)
 	return matches;
 };
 
-lex_install ::= func(t : lex_token, front_identifier : u8?, break : lex_break_type -> v0)
+lex_install ::= func(t : lex_token, front_identifier : u8?, break : lex_break_type, a : arena mut? -> v0)
 {
 	// for each char 'c' in the front identifier:
 	// take entry 'e' from index 'c' # the current table and look # its tag
@@ -571,7 +571,7 @@ lex_install ::= func(t : lex_token, front_identifier : u8?, break : lex_break_ty
 		ent = ((tbl->tbl) # c);
 		if((ent->tag) == (lex_entry_tag.success))
 		{
-			newtbl = lex_newtable();
+			newtbl = lex_newtable(a);
 			if((ent->next) == zero)
 			{
 				(ent->next) = (newtbl@v0?);
@@ -579,7 +579,7 @@ lex_install ::= func(t : lex_token, front_identifier : u8?, break : lex_break_ty
 		}
 		if((ent->tag) == (lex_entry_tag.discard))
 		{
-			newtbl = lex_newtable();
+			newtbl = lex_newtable(a);
 			(deref ent) = lex_entry
 			{
 				.tag := lex_entry_tag.none;
@@ -590,7 +590,7 @@ lex_install ::= func(t : lex_token, front_identifier : u8?, break : lex_break_ty
 		}
 		if((ent->tag) == zero)
 		{
-			newtbl = lex_newtable();
+			newtbl = lex_newtable(a);
 			(deref ent) = lex_entry
 			{
 				.tag := lex_entry_tag.none;
@@ -645,7 +645,7 @@ lex_install ::= func(t : lex_token, front_identifier : u8?, break : lex_break_ty
 	}
 };
 
-lex_setup ::= func(-> v0)
+lex_setup ::= func(a : arena mut? -> v0)
 {
 	main_table_setup(ref main_table);
 	string_table_setup();
@@ -654,15 +654,15 @@ lex_setup ::= func(-> v0)
 	binary_table_setup();
 
 	everything ::= (lex_break_type.everything);
-	lex_install(lex_token.colon, ":", everything | (lex_break_type.not_equals_symbol));
-	lex_install(lex_token.comma, ",", zero);
-	lex_install(lex_token.obrace, "{", zero);
-	lex_install(lex_token.cbrace, "}", zero);
-	lex_install(lex_token.obrack, "[", zero);
-	lex_install(lex_token.cbrack, "]", zero);
-	lex_install(lex_token.keyword_true, "true", lex_break_type.punctuation_or_whitespace);
-	lex_install(lex_token.keyword_false, "false", lex_break_type.punctuation_or_whitespace);
-	lex_install(lex_token.keyword_null, "null", lex_break_type.punctuation_or_whitespace);
+	lex_install(lex_token.colon, ":", everything | (lex_break_type.not_equals_symbol), a);
+	lex_install(lex_token.comma, ",", zero, a);
+	lex_install(lex_token.obrace, "{", zero, a);
+	lex_install(lex_token.cbrace, "}", zero, a);
+	lex_install(lex_token.obrack, "[", zero, a);
+	lex_install(lex_token.cbrack, "]", zero, a);
+	lex_install(lex_token.keyword_true, "true", lex_break_type.punctuation_or_whitespace, a);
+	lex_install(lex_token.keyword_false, "false", lex_break_type.punctuation_or_whitespace, a);
+	lex_install(lex_token.keyword_null, "null", lex_break_type.punctuation_or_whitespace, a);
 
 	comment_table_setup();
 };
@@ -685,7 +685,7 @@ ls_verbose_print ::= func(s : lex_state? -> v0)
 	putchar(10);
 };
 
-ls_push_token ::= func(state : lex_state mut?, token : token_data -> v0)
+ls_push_token ::= func(state : lex_state mut?, token : token_data, a : arena mut? -> v0)
 {
 	if((state->tokens) == zero)
 	{
@@ -698,7 +698,7 @@ ls_push_token ::= func(state : lex_state mut?, token : token_data -> v0)
 		old_tokens ::= state->tokens;
 
 		(state->tokens_cap) = (state->tokens_cap) * 2;
-		(state->tokens) = arena_alloc(global_arena, __sizeof(deref (state->tokens)) * (state->tokens_cap));
+		(state->tokens) = arena_alloc(a, __sizeof(deref (state->tokens)) * (state->tokens_cap));
 		memcopy(state->tokens, old_tokens, __sizeof(deref (state->tokens)) * oldcap);
 	}
 	deref((state->tokens) # (state->tokens_size)) = token;
@@ -742,7 +742,7 @@ lex_discard ::= func(s : lex_state mut? -> v0)
 	(s->internal) = zero;
 };
 
-lex_next ::= func(s : lex_state mut? -> v0)
+lex_next ::= func(s : lex_state mut?, a : arena mut? -> v0)
 {
 	entry ::= lex_get(s);
 	should_advance : bool mut;
@@ -787,7 +787,7 @@ lex_next ::= func(s : lex_state mut? -> v0)
 			(lex->off) = (lex->off) + 1;
 			(lex->len) = (lex->len) - 2;
 		}
-		ls_push_token(s, tok);
+		ls_push_token(s, tok, a);
 		lex_discard(s);
 	}
 	if((entry->tag) == (lex_entry_tag.discard))
@@ -801,7 +801,7 @@ lex_next ::= func(s : lex_state mut? -> v0)
 	}
 };
 
-lex ::= func(path : u8?, src : u8?, verbose_lex : bool -> lex_state)
+lex ::= func(path : u8?, src : u8?, verbose_lex : bool, a : arena mut? -> lex_state)
 {
 	ret : lex_state mut := zero;
 	(ret.line) = 1;
@@ -809,12 +809,12 @@ lex ::= func(path : u8?, src : u8?, verbose_lex : bool -> lex_state)
 	(ret.path) = path;
 	(ret.src) = src;
 	(ret.tokens_cap) = 1024;
-	(ret.tokens) = arena_alloc(global_arena, __sizeof(deref (ret.tokens)) * (ret.tokens_cap));
+	(ret.tokens) = arena_alloc(a, __sizeof(deref (ret.tokens)) * (ret.tokens_cap));
 	len ::= zstrlen(src);
 
 	while((ret.cursor) < len@_)
 	{
-		lex_next(ref ret);
+		lex_next(ref ret, a);
 	}
 
 	if(verbose_lex)
