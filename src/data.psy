@@ -56,4 +56,9 @@ json_data_verbose_print ::= func(j : json_data, tabcount : u64 -> v0)
 	putzstr(" ");
 	putloc(j.loc);
 	putchar(10);
+	cptr ::= (j.children)@json_data?;
+	for(i = 0, i < (j.childcount), i = i + 1)
+	{
+		json_data_verbose_print(deref(cptr # i), tabcount + 1);
+	}
 };

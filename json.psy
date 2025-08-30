@@ -84,7 +84,7 @@ main ::= func(iargc : s32, iargv : u8??, ienvp : u8?? -> s32)
 	}
 	source ::= fully_read_file(args.file, global_arena);
 	tokens ::= lex(args.file, source, false, global_arena);
-	json ::= parse(tokens, true);
+	json ::= parse(tokens, global_arena, true);
 	
 	return 0;
 };

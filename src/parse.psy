@@ -27,7 +27,55 @@ stash_pop ::= func(i : internal_parse_state mut? -> json_data)
 	return stashlast;
 };
 
-parse_one ::= func(l : lex_state, s : parse_state mut? -> v0)
+stash_peek ::= func(i : internal_parse_state? -> json_data mut?)
+{
+	if(i->stash_size == 0)
+	{
+		putzstr("stash_peek on empty stash");
+		__debugbreak();
+	}
+	return i->stash # ((i->stash_size) - 1);
+};
+
+stash_push ::= func(i : internal_parse_state mut?, j : json_data, a : arena mut? -> v0)
+{
+	if(i->stash == zero)
+	{
+		i->stash_cap = 8;
+		i->stash = arena_alloc(a, __sizeof(json_data) * (i->stash_cap));
+	}
+	while(i->stash_cap < (i->stash_size))
+	{
+		oldcap ::= i->stash_cap;
+		olddata ::= i->stash;
+		i->stash_cap = (i->stash_cap) * 2;
+		i->stash = arena_alloc(a, __sizeof(json_data) * (i->stash_cap));
+		memcopy(i->stash, olddata, __sizeof(json_data) * oldcap);
+	}
+	deref(i->stash # (i->stash_size)) = j;
+	i->stash_size = (i->stash_size) + 1;
+};
+
+parse_push ::= func(s : parse_state mut?, j : json_data, a : arena mut? -> v0)
+{
+	if(s->nodes == zero)
+	{
+		s->nodes_cap = 8;
+		s->nodes = arena_alloc(a, __sizeof(json_data) * (s->nodes_cap));
+	}
+	while(s->nodes_cap < (s->nodes_size))
+	{
+		oldcap ::= s->nodes_cap;
+		olddata ::= s->nodes;
+		s->nodes_cap = (s->nodes_cap) * 2;
+		s->nodes = arena_alloc(a, __sizeof(json_data) * (s->nodes_cap));
+		memcopy(s->nodes, olddata, __sizeof(json_data) * oldcap);
+	}
+	deref(s->nodes # (s->nodes_size)) = j;
+	s->nodes_size = (s->nodes_size) + 1;
+};
+
+parse_one ::= func(l : lex_state, s : parse_state mut?, a : arena mut? -> v0)
 {
 	i ::= ref(s->internal);
 	token ::= deref(l.tokens # (i->lex_cursor));
@@ -35,6 +83,14 @@ parse_one ::= func(l : lex_state, s : parse_state mut? -> v0)
 	{
 		// start of a new object. snore
 		// make an object json_data that is empty and shove it into the stash.
+		stash_push(i, json_data
+		{
+			.type := json_data_type.object;
+			.children := zero;
+			.childcap := zero;
+			.childcount := zero;
+			.loc := token.begin;
+		}, a);
 	}
 	if(token.tok == lex_token.cbrace)
 	{
@@ -43,17 +99,26 @@ parse_one ::= func(l : lex_state, s : parse_state mut? -> v0)
 		obj ::= stash_pop(i);
 		// if the stash is now empty then we have a top-level object. just add it to parse_state.nodes
 		// if stash is not empty then this is a subobject. add it as a child to that instead.
+		if(i->stash_size == 0)
+		{
+			parse_push(s, obj, a);
+		}
+		else
+		{
+			json_data_add_child(stash_peek(i), obj, a);
+		}
 	}
+	i->lex_cursor = (i->lex_cursor) + 1;
 };
 
-parse ::= func(l : lex_state, verbose_parse : bool -> parse_state)
+parse ::= func(l : lex_state, a : arena mut?, verbose_parse : bool -> parse_state)
 {
 	i : u64 mut;
 
 	ret ::= zero@parse_state mut;
 	while(ret.internal.lex_cursor < (l.tokens_size))
 	{
-		parse_one(l, ref ret);
+		parse_one(l, ref ret, a);
 	}
 	if(verbose_parse)
 	{
