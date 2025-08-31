@@ -98,51 +98,64 @@ parse_one ::= func(l : lex_state, s : parse_state mut?, a : arena mut? -> v0)
 		// if the top is a string literal
 		// then we are a string value not a key
 		stashed ::= stash_peek(i);
-		if(stashed->type == json_data_type.string_literal)
+		if(stashed->type == json_data_type.array)
 		{
+			// no concept of last_string here, just add it
 			json_data_add_child(stashed, str, global_arena);		
-			putzstr("setting '");
-			putbytes(str.chars, str.chars_len);
-			putzstr("' as value of stashed key '");
-			putbytes(stashed->chars, stashed->chars_len);
-			putzstr("'");
-			putchar(10);
 		}
 		else
 		{
-			i->last_string = str;
-			i->has_last_string = true;
+			if(stashed->type == json_data_type.string_literal)
+			{
+				json_data_add_child(stashed, str, global_arena);		
+				putzstr("setting '");
+				putbytes(str.chars, str.chars_len);
+				putzstr("' as value of stashed key '");
+				putbytes(stashed->chars, stashed->chars_len);
+				putzstr("'");
+				putchar(10);
+			}
+			else
+			{
+				i->last_string = str;
+				i->has_last_string = true;
+			}
 		}
 	}
 	if(token.tok == lex_token.comma)
 	{
-		// end of a thing.
-		// take it off of the stash
-		thing ::= stash_pop(i);
-		// if the stash is now empty then we have a top-level object. just add it to parse_state.nodes
-		// if stash is not empty then this is a subobject. add it as a child to that instead.
-		putzstr("node ");
-		putloc(thing.loc);
-		putzstr(" is being ");
-		if(i->stash_size == 0)
+		// if top of stash is an array
+		// ignore it
+		if(stash_peek(i)->type != json_data_type.array)
 		{
-			putzstr("finalized");
-			parse_push(s, thing, a);
-		}
-		else
-		{
-			peeked_top ::= stash_peek(i);
-			json_data_add_child(peeked_top, thing, a);
-			putzstr("sent as a child to stashtop ");
-			putzstr(__enumname(peeked_top->type));
-			if(peeked_top->type == json_data_type.string_literal)
+			// end of a thing.
+			// take it off of the stash
+			thing ::= stash_pop(i);
+			// if the stash is now empty then we have a top-level object. just add it to parse_state.nodes
+			// if stash is not empty then this is a subobject. add it as a child to that instead.
+			putzstr("node ");
+			putloc(thing.loc);
+			putzstr(" is being ");
+			if(i->stash_size == 0)
 			{
-				putzstr(" '");
-				putbytes(peeked_top->chars, peeked_top->chars_len);
-				putzstr("'");
+				putzstr("finalized");
+				parse_push(s, thing, a);
 			}
+			else
+			{
+				peeked_top ::= stash_peek(i);
+				json_data_add_child(peeked_top, thing, a);
+				putzstr("sent as a child to stashtop ");
+				putzstr(__enumname(peeked_top->type));
+				if(peeked_top->type == json_data_type.string_literal)
+				{
+					putzstr(" '");
+					putbytes(peeked_top->chars, peeked_top->chars_len);
+					putzstr("'");
+				}
+			}
+			putchar(10);
 		}
-		putchar(10);
 	}
 	if(token.tok == lex_token.colon)
 	{
@@ -224,6 +237,51 @@ parse_one ::= func(l : lex_state, s : parse_state mut?, a : arena mut? -> v0)
 		else
 		{
 			json_data_add_child(stash_peek(i), num, a);
+		}
+	}
+	if(token.tok == lex_token.obrack)
+	{
+		// start of a new array. snore
+		// make an object json_data that is empty and shove it into the stash.
+		putzstr("empty array shoved onto back of stash");
+		putchar(10);
+		stash_push(i, json_data
+		{
+			.type := json_data_type.array;
+			.children := zero;
+			.childcap := zero;
+			.childcount := zero;
+			.loc := token.begin;
+		}, a);
+	}
+	if(token.tok == lex_token.cbrack)
+	{
+		// note: in json the last array element doesnt have to have a proceeding comma
+		// we handle that case by: if the thing at the top of the stash is not an object then just commit that right now and continue on assuming the next thing must be the object itself.
+		if(stash_peek(i)->type != json_data_type.array)
+		{
+			last_elem ::= stash_pop(i);	
+			json_data_add_child(stash_peek(i), last_elem, a);
+		}
+		// end of an object.
+		// take it off of the stash
+		arr ::= stash_pop(i);
+		if(arr.type != json_data_type.array)
+		{
+			putzstr("at cbrack expected thing at end of stash to be an array, but it is a ");
+			putzstr(__enumname(arr.type));
+			putzstr(" ");
+			putloc(arr.loc);
+			__debugbreak();
+		}
+		// if the stash is now empty then we have a top-level array. just add it to parse_state.nodes
+		if(i->stash_size == 0)
+		{
+			parse_push(s, arr, a);
+		}
+		else
+		{
+			json_data_add_child(stash_peek(i), arr, a);
 		}
 	}
 	if(token.tok == lex_token.keyword_true)
