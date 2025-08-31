@@ -1,12 +1,12 @@
-parse_state ::= struct
+json_parse_state ::= struct
 {
 	nodes : json_data mut?;
 	nodes_size : u64;
 	nodes_cap : u64;
-	internal : internal_parse_state mut;
+	internal : internal_json_parse_state mut;
 };
 
-internal_parse_state ::= struct
+internal_json_parse_state ::= struct
 {
 	stash : json_data mut?;
 	stash_size : u64;
@@ -17,7 +17,7 @@ internal_parse_state ::= struct
 	has_last_string : bool;
 };
 
-stash_pop ::= func(i : internal_parse_state mut? -> json_data)
+stash_pop ::= func(i : internal_json_parse_state mut? -> json_data)
 {
 	if(i->stash_size == 0)
 	{
@@ -29,7 +29,7 @@ stash_pop ::= func(i : internal_parse_state mut? -> json_data)
 	return stashlast;
 };
 
-stash_peek ::= func(i : internal_parse_state? -> json_data mut?)
+stash_peek ::= func(i : internal_json_parse_state? -> json_data mut?)
 {
 	if(i->stash_size == 0)
 	{
@@ -39,7 +39,7 @@ stash_peek ::= func(i : internal_parse_state? -> json_data mut?)
 	return i->stash # ((i->stash_size) - 1);
 };
 
-stash_push ::= func(i : internal_parse_state mut?, j : json_data, a : arena mut? -> v0)
+stash_push ::= func(i : internal_json_parse_state mut?, j : json_data, a : arena mut? -> v0)
 {
 	if(i->stash == zero)
 	{
@@ -58,7 +58,7 @@ stash_push ::= func(i : internal_parse_state mut?, j : json_data, a : arena mut?
 	i->stash_size = (i->stash_size) + 1;
 };
 
-parse_push ::= func(s : parse_state mut?, j : json_data, a : arena mut? -> v0)
+json_parse_push ::= func(s : json_parse_state mut?, j : json_data, a : arena mut? -> v0)
 {
 	if(s->nodes == zero)
 	{
@@ -77,17 +77,17 @@ parse_push ::= func(s : parse_state mut?, j : json_data, a : arena mut? -> v0)
 	s->nodes_size = (s->nodes_size) + 1;
 };
 
-parse_one ::= func(l : lex_state, s : parse_state mut?, a : arena mut? -> v0)
+json_parse_one ::= func(l : json_lex_state, s : json_parse_state mut?, a : arena mut? -> v0)
 {
 	i ::= ref(s->internal);
 	token ::= deref(l.tokens # (i->lex_cursor));
-	if(token.tok == lex_token.string_literal)
+	if(token.tok == json_lex_token.string_literal)
 	{
 		str ::= json_data
 		{
 			.type := json_data_type.string_literal;
-			.chars := (l.src) # (token.lexeme.off);
-			.chars_len := token.lexeme.len;
+			.chars := (l.src) # (token.json_lexeme.off);
+			.chars_len := token.json_lexeme.len;
 			.children := zero;
 			.childcap := zero;
 			.childcount := zero;
@@ -116,7 +116,7 @@ parse_one ::= func(l : lex_state, s : parse_state mut?, a : arena mut? -> v0)
 			}
 		}
 	}
-	if(token.tok == lex_token.comma)
+	if(token.tok == json_lex_token.comma)
 	{
 		// if top of stash is an array
 		// ignore it
@@ -125,11 +125,11 @@ parse_one ::= func(l : lex_state, s : parse_state mut?, a : arena mut? -> v0)
 			// end of a thing.
 			// take it off of the stash
 			thing ::= stash_pop(i);
-			// if the stash is now empty then we have a top-level object. just add it to parse_state.nodes
+			// if the stash is now empty then we have a top-level object. just add it to json_parse_state.nodes
 			// if stash is not empty then this is a subobject. add it as a child to that instead.
 			if(i->stash_size == 0)
 			{
-				parse_push(s, thing, a);
+				json_parse_push(s, thing, a);
 			}
 			else
 			{
@@ -138,7 +138,7 @@ parse_one ::= func(l : lex_state, s : parse_state mut?, a : arena mut? -> v0)
 			}
 		}
 	}
-	if(token.tok == lex_token.colon)
+	if(token.tok == json_lex_token.colon)
 	{
 		if(!(i->has_last_string))
 		{
@@ -150,7 +150,7 @@ parse_one ::= func(l : lex_state, s : parse_state mut?, a : arena mut? -> v0)
 		i->has_last_string = false;
 		i->last_string = zero;
 	}
-	if(token.tok == lex_token.obrace)
+	if(token.tok == json_lex_token.obrace)
 	{
 		// start of a new object. snore
 		// make an object json_data that is empty and shove it into the stash.
@@ -163,7 +163,7 @@ parse_one ::= func(l : lex_state, s : parse_state mut?, a : arena mut? -> v0)
 			.loc := token.begin;
 		}, a);
 	}
-	if(token.tok == lex_token.cbrace)
+	if(token.tok == json_lex_token.cbrace)
 	{
 		// note: in json a key-value pair doesnt have to end with a trailing comma if a cbrace is coming next
 		// we handle that case by: if the thing at the top of the stash is not an object then just commit that right now and continue on assuming the next thing must be the object itself.
@@ -183,18 +183,18 @@ parse_one ::= func(l : lex_state, s : parse_state mut?, a : arena mut? -> v0)
 			putloc(obj.loc);
 			__debugbreak();
 		}
-		// if the stash is now empty then we have a top-level object. just add it to parse_state.nodes
+		// if the stash is now empty then we have a top-level object. just add it to json_parse_state.nodes
 		// if stash is not empty then this is a subobject. add it as a child to that instead.
 		if(i->stash_size == 0)
 		{
-			parse_push(s, obj, a);
+			json_parse_push(s, obj, a);
 		}
 		else
 		{
 			json_data_add_child(stash_peek(i), obj, a);
 		}
 	}
-	if(token.tok == lex_token.numeric_literal)
+	if(token.tok == json_lex_token.numeric_literal)
 	{
 		num ::= json_data
 		{
@@ -207,14 +207,14 @@ parse_one ::= func(l : lex_state, s : parse_state mut?, a : arena mut? -> v0)
 		};
 		if(i->stash_size == 0)
 		{
-			parse_push(s, num, a);
+			json_parse_push(s, num, a);
 		}
 		else
 		{
 			json_data_add_child(stash_peek(i), num, a);
 		}
 	}
-	if(token.tok == lex_token.obrack)
+	if(token.tok == json_lex_token.obrack)
 	{
 		// start of a new array. snore
 		// make an object json_data that is empty and shove it into the stash.
@@ -227,7 +227,7 @@ parse_one ::= func(l : lex_state, s : parse_state mut?, a : arena mut? -> v0)
 			.loc := token.begin;
 		}, a);
 	}
-	if(token.tok == lex_token.cbrack)
+	if(token.tok == json_lex_token.cbrack)
 	{
 		// note: in json the last array element doesnt have to have a proceeding comma
 		// we handle that case by: if the thing at the top of the stash is not an object then just commit that right now and continue on assuming the next thing must be the object itself.
@@ -247,17 +247,17 @@ parse_one ::= func(l : lex_state, s : parse_state mut?, a : arena mut? -> v0)
 			putloc(arr.loc);
 			__debugbreak();
 		}
-		// if the stash is now empty then we have a top-level array. just add it to parse_state.nodes
+		// if the stash is now empty then we have a top-level array. just add it to json_parse_state.nodes
 		if(i->stash_size == 0)
 		{
-			parse_push(s, arr, a);
+			json_parse_push(s, arr, a);
 		}
 		else
 		{
 			json_data_add_child(stash_peek(i), arr, a);
 		}
 	}
-	if(token.tok == lex_token.keyword_true)
+	if(token.tok == json_lex_token.keyword_true)
 	{
 		tboolean ::= json_data
 		{
@@ -270,14 +270,14 @@ parse_one ::= func(l : lex_state, s : parse_state mut?, a : arena mut? -> v0)
 		};
 		if(i->stash_size == 0)
 		{
-			parse_push(s, tboolean, a);
+			json_parse_push(s, tboolean, a);
 		}
 		else
 		{
 			json_data_add_child(stash_peek(i), tboolean, a);
 		}
 	}
-	if(token.tok == lex_token.keyword_false)
+	if(token.tok == json_lex_token.keyword_false)
 	{
 		fboolean ::= json_data
 		{
@@ -290,14 +290,14 @@ parse_one ::= func(l : lex_state, s : parse_state mut?, a : arena mut? -> v0)
 		};
 		if(i->stash_size == 0)
 		{
-			parse_push(s, fboolean, a);
+			json_parse_push(s, fboolean, a);
 		}
 		else
 		{
 			json_data_add_child(stash_peek(i), fboolean, a);
 		}
 	}
-	if(token.tok == lex_token.keyword_null)
+	if(token.tok == json_lex_token.keyword_null)
 	{
 		null ::= json_data
 		{
@@ -309,7 +309,7 @@ parse_one ::= func(l : lex_state, s : parse_state mut?, a : arena mut? -> v0)
 		};
 		if(i->stash_size == 0)
 		{
-			parse_push(s, null, a);
+			json_parse_push(s, null, a);
 		}
 		else
 		{
@@ -319,14 +319,14 @@ parse_one ::= func(l : lex_state, s : parse_state mut?, a : arena mut? -> v0)
 	i->lex_cursor = (i->lex_cursor) + 1;
 };
 
-parse ::= func(l : lex_state, a : arena mut?, verbose_parse : bool -> parse_state)
+json_do_parse ::= func(l : json_lex_state, a : arena mut?, verbose_parse : bool -> json_data)
 {
 	i : u64 mut;
 
-	ret ::= zero@parse_state mut;
+	ret ::= zero@json_parse_state mut;
 	while(ret.internal.lex_cursor < (l.tokens_size))
 	{
-		parse_one(l, ref ret, a);
+		json_parse_one(l, ref ret, a);
 	}
 	if(verbose_parse)
 	{
@@ -335,5 +335,10 @@ parse ::= func(l : lex_state, a : arena mut?, verbose_parse : bool -> parse_stat
 			json_data_verbose_print(deref(ret.nodes # i), 0);
 		}
 	}
-	return ret;
+	if(ret.nodes_size > 1)
+	{
+		putzstr("more than one top-level value in a single .json is not allowed");
+		__debugbreak();
+	}
+	return deref(ret.nodes);
 };

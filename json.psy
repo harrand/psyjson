@@ -85,6 +85,28 @@ argc : s32 mut;
 argv : u8?? mut;
 envp : u8?? mut;
 
+json_parse_buffer_named ::= func(name : u8?, buf : u8?, len : u64, a : arena mut? -> json_data)
+{
+	tokens ::= json_lex(name, buf, len, false, a);
+	return json_do_parse(tokens, global_arena, false);
+};
+
+json_parse_buffer ::= func(buf : u8?, len : u64, a : arena mut? -> json_data)
+{
+	return json_parse_buffer_named("<untitled>", buf, len, a);
+};
+
+json_parse_file ::= func(path : u8?, a : arena mut? -> json_data)
+{
+	source ::= fully_read_file(path, a);
+	return json_parse_buffer_named(path, source, zstrlen(source), a);
+};
+
+json_print ::= func(j : json_data -> v0)
+{
+	json_data_verbose_print(j, 0);
+};
+
 main ::= func(iargc : s32, iargv : u8??, ienvp : u8?? -> s32)
 {
 	argc = iargc;
@@ -92,7 +114,7 @@ main ::= func(iargc : s32, iargv : u8??, ienvp : u8?? -> s32)
 	envp = ienvp;
 	setup_arenas();
 	defer destroy_arenas();
-	lex_setup(global_arena);
+	json_lex_setup(global_arena);
 
 	args ::= json_parse_args(global_arena);
 	if(args.file == zero)
@@ -101,9 +123,8 @@ main ::= func(iargc : s32, iargv : u8??, ienvp : u8?? -> s32)
 		putchar(10);
 		__debugbreak();
 	}
-	source ::= fully_read_file(args.file, global_arena);
-	tokens ::= lex(args.file, source, false, global_arena);
-	json ::= parse(tokens, global_arena, true);
+	json ::= json_parse_file(args.file, global_arena);
+	json_print(json);
 	
 	return 0;
 };
