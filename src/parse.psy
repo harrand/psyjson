@@ -108,12 +108,6 @@ parse_one ::= func(l : lex_state, s : parse_state mut?, a : arena mut? -> v0)
 			if(stashed->type == json_data_type.string_literal)
 			{
 				json_data_add_child(stashed, str, global_arena);		
-				putzstr("setting '");
-				putbytes(str.chars, str.chars_len);
-				putzstr("' as value of stashed key '");
-				putbytes(stashed->chars, stashed->chars_len);
-				putzstr("'");
-				putchar(10);
 			}
 			else
 			{
@@ -133,28 +127,15 @@ parse_one ::= func(l : lex_state, s : parse_state mut?, a : arena mut? -> v0)
 			thing ::= stash_pop(i);
 			// if the stash is now empty then we have a top-level object. just add it to parse_state.nodes
 			// if stash is not empty then this is a subobject. add it as a child to that instead.
-			putzstr("node ");
-			putloc(thing.loc);
-			putzstr(" is being ");
 			if(i->stash_size == 0)
 			{
-				putzstr("finalized");
 				parse_push(s, thing, a);
 			}
 			else
 			{
 				peeked_top ::= stash_peek(i);
 				json_data_add_child(peeked_top, thing, a);
-				putzstr("sent as a child to stashtop ");
-				putzstr(__enumname(peeked_top->type));
-				if(peeked_top->type == json_data_type.string_literal)
-				{
-					putzstr(" '");
-					putbytes(peeked_top->chars, peeked_top->chars_len);
-					putzstr("'");
-				}
 			}
-			putchar(10);
 		}
 	}
 	if(token.tok == lex_token.colon)
@@ -165,10 +146,6 @@ parse_one ::= func(l : lex_state, s : parse_state mut?, a : arena mut? -> v0)
 			putloc(token.begin);
 			__debugbreak();
 		}
-		putzstr("string '");
-		putbytes(i->last_string.chars, i->last_string.chars_len);
-		putzstr("' stashed as it is a key awaiting a value");
-		putchar(10);
 		stash_push(i, i->last_string, a);
 		i->has_last_string = false;
 		i->last_string = zero;
@@ -177,8 +154,6 @@ parse_one ::= func(l : lex_state, s : parse_state mut?, a : arena mut? -> v0)
 	{
 		// start of a new object. snore
 		// make an object json_data that is empty and shove it into the stash.
-		putzstr("empty object shoved onto back of stash");
-		putchar(10);
 		stash_push(i, json_data
 		{
 			.type := json_data_type.object;
@@ -243,8 +218,6 @@ parse_one ::= func(l : lex_state, s : parse_state mut?, a : arena mut? -> v0)
 	{
 		// start of a new array. snore
 		// make an object json_data that is empty and shove it into the stash.
-		putzstr("empty array shoved onto back of stash");
-		putchar(10);
 		stash_push(i, json_data
 		{
 			.type := json_data_type.array;
@@ -357,9 +330,6 @@ parse ::= func(l : lex_state, a : arena mut?, verbose_parse : bool -> parse_stat
 	}
 	if(verbose_parse)
 	{
-		putuint(ret.nodes_size);
-		putzstr(" json nodes: ");
-		putchar(10);
 		for(i = 0, i < (ret.nodes_size), i = i + 1)
 		{
 			json_data_verbose_print(deref(ret.nodes # i), 0);

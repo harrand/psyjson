@@ -1,7 +1,26 @@
 == default ==
 {
+	warning("No build config specified. Defaulting to debug...");
+	debug();
+}
+
+== debug ==
+{
+	debug_symbols(true);
+	set_optimization(0);
+	base();
+}
+
+== release ==
+{
+	set_optimization(3);
+	base();
+}
+
+== base ==
+{
 	add_source_directory("src");
-	add_build_file("psystdlib/stdlib.psy", _config);
+	add_build_file("psystdlib/stdlib.psy", "default");
 
 	set_executable("json");
 }
