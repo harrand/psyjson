@@ -13,6 +13,8 @@ internal_parse_state ::= struct
 	stash_cap : u64;
 
 	lex_cursor : u64;
+	last_string : json_data;
+	has_last_string : bool;
 };
 
 stash_pop ::= func(i : internal_parse_state mut? -> json_data)
@@ -23,7 +25,7 @@ stash_pop ::= func(i : internal_parse_state mut? -> json_data)
 		__debugbreak();
 	}
 	stashlast ::= deref(i->stash # ((i->stash_size) - 1));
-	i->stash_size = (i->stash_size) - 1;
+	i->stash_size = ((i->stash_size) - 1);
 	return stashlast;
 };
 
@@ -41,14 +43,14 @@ stash_push ::= func(i : internal_parse_state mut?, j : json_data, a : arena mut?
 {
 	if(i->stash == zero)
 	{
-		i->stash_cap = 8;
+		i->stash_cap = 64;
 		i->stash = arena_alloc(a, __sizeof(json_data) * (i->stash_cap));
 	}
 	while(i->stash_cap < (i->stash_size))
 	{
 		oldcap ::= i->stash_cap;
 		olddata ::= i->stash;
-		i->stash_cap = (i->stash_cap) * 2;
+		i->stash_cap = ((i->stash_cap) * 2);
 		i->stash = arena_alloc(a, __sizeof(json_data) * (i->stash_cap));
 		memcopy(i->stash, olddata, __sizeof(json_data) * oldcap);
 	}
@@ -79,10 +81,91 @@ parse_one ::= func(l : lex_state, s : parse_state mut?, a : arena mut? -> v0)
 {
 	i ::= ref(s->internal);
 	token ::= deref(l.tokens # (i->lex_cursor));
+	if(token.tok == lex_token.string_literal)
+	{
+		str ::= json_data
+		{
+			.type := json_data_type.string_literal;
+			.chars := (l.src) # (token.lexeme.off);
+			.chars_len := token.lexeme.len;
+			.children := zero;
+			.childcap := zero;
+			.childcount := zero;
+			.loc := token.begin;
+		};
+
+		// peek at the stash
+		// if the top is a string literal
+		// then we are a string value not a key
+		stashed ::= stash_peek(i);
+		if(stashed->type == json_data_type.string_literal)
+		{
+			json_data_add_child(stashed, str, global_arena);		
+			putzstr("setting '");
+			putbytes(str.chars, str.chars_len);
+			putzstr("' as value of stashed key '");
+			putbytes(stashed->chars, stashed->chars_len);
+			putzstr("'");
+			putchar(10);
+		}
+		else
+		{
+			i->last_string = str;
+			i->has_last_string = true;
+		}
+	}
+	if(token.tok == lex_token.comma)
+	{
+		// end of a thing.
+		// take it off of the stash
+		thing ::= stash_pop(i);
+		// if the stash is now empty then we have a top-level object. just add it to parse_state.nodes
+		// if stash is not empty then this is a subobject. add it as a child to that instead.
+		putzstr("node ");
+		putloc(thing.loc);
+		putzstr(" is being ");
+		if(i->stash_size == 0)
+		{
+			putzstr("finalized");
+			parse_push(s, thing, a);
+		}
+		else
+		{
+			peeked_top ::= stash_peek(i);
+			json_data_add_child(peeked_top, thing, a);
+			putzstr("sent as a child to stashtop ");
+			putzstr(__enumname(peeked_top->type));
+			if(peeked_top->type == json_data_type.string_literal)
+			{
+				putzstr(" '");
+				putbytes(peeked_top->chars, peeked_top->chars_len);
+				putzstr("'");
+			}
+		}
+		putchar(10);
+	}
+	if(token.tok == lex_token.colon)
+	{
+		if(!(i->has_last_string))
+		{
+			putzstr("colon must directly proceed a string literal ");
+			putloc(token.begin);
+			__debugbreak();
+		}
+		putzstr("string '");
+		putbytes(i->last_string.chars, i->last_string.chars_len);
+		putzstr("' stashed as it is a key awaiting a value");
+		putchar(10);
+		stash_push(i, i->last_string, a);
+		i->has_last_string = false;
+		i->last_string = zero;
+	}
 	if(token.tok == lex_token.obrace)
 	{
 		// start of a new object. snore
 		// make an object json_data that is empty and shove it into the stash.
+		putzstr("empty object shoved onto back of stash");
+		putchar(10);
 		stash_push(i, json_data
 		{
 			.type := json_data_type.object;
@@ -94,9 +177,24 @@ parse_one ::= func(l : lex_state, s : parse_state mut?, a : arena mut? -> v0)
 	}
 	if(token.tok == lex_token.cbrace)
 	{
+		// note: in json a key-value pair doesnt have to end with a trailing comma if a cbrace is coming next
+		// we handle that case by: if the thing at the top of the stash is not an object then just commit that right now and continue on assuming the next thing must be the object itself.
+		if(stash_peek(i)->type != json_data_type.object)
+		{
+			last_kv ::= stash_pop(i);	
+			json_data_add_child(stash_peek(i), last_kv, a);
+		}
 		// end of an object.
 		// take it off of the stash
 		obj ::= stash_pop(i);
+		if(obj.type != json_data_type.object)
+		{
+			putzstr("at cbrace expected thing at end of stash to be an object, but it is a ");
+			putzstr(__enumname(obj.type));
+			putzstr(" ");
+			putloc(obj.loc);
+			__debugbreak();
+		}
 		// if the stash is now empty then we have a top-level object. just add it to parse_state.nodes
 		// if stash is not empty then this is a subobject. add it as a child to that instead.
 		if(i->stash_size == 0)
@@ -106,6 +204,85 @@ parse_one ::= func(l : lex_state, s : parse_state mut?, a : arena mut? -> v0)
 		else
 		{
 			json_data_add_child(stash_peek(i), obj, a);
+		}
+	}
+	if(token.tok == lex_token.numeric_literal)
+	{
+		num ::= json_data
+		{
+			.type := json_data_type.numeric_literal;
+			.number := 69; // todo: parse this properly
+			.children := zero;
+			.childcap := zero;
+			.childcount := zero;
+			.loc := token.begin;
+		};
+		if(i->stash_size == 0)
+		{
+			parse_push(s, num, a);
+		}
+		else
+		{
+			json_data_add_child(stash_peek(i), num, a);
+		}
+	}
+	if(token.tok == lex_token.keyword_true)
+	{
+		tboolean ::= json_data
+		{
+			.type := json_data_type.bool_literal;
+			.boolean := true;
+			.children := zero;
+			.childcap := zero;
+			.childcount := zero;
+			.loc := token.begin;
+		};
+		if(i->stash_size == 0)
+		{
+			parse_push(s, tboolean, a);
+		}
+		else
+		{
+			json_data_add_child(stash_peek(i), tboolean, a);
+		}
+	}
+	if(token.tok == lex_token.keyword_false)
+	{
+		fboolean ::= json_data
+		{
+			.type := json_data_type.bool_literal;
+			.boolean := false;
+			.children := zero;
+			.childcap := zero;
+			.childcount := zero;
+			.loc := token.begin;
+		};
+		if(i->stash_size == 0)
+		{
+			parse_push(s, fboolean, a);
+		}
+		else
+		{
+			json_data_add_child(stash_peek(i), fboolean, a);
+		}
+	}
+	if(token.tok == lex_token.keyword_null)
+	{
+		null ::= json_data
+		{
+			.type := json_data_type.null_literal;
+			.children := zero;
+			.childcap := zero;
+			.childcount := zero;
+			.loc := token.begin;
+		};
+		if(i->stash_size == 0)
+		{
+			parse_push(s, null, a);
+		}
+		else
+		{
+			json_data_add_child(stash_peek(i), null, a);
 		}
 	}
 	i->lex_cursor = (i->lex_cursor) + 1;
@@ -122,6 +299,9 @@ parse ::= func(l : lex_state, a : arena mut?, verbose_parse : bool -> parse_stat
 	}
 	if(verbose_parse)
 	{
+		putuint(ret.nodes_size);
+		putzstr(" json nodes: ");
+		putchar(10);
 		for(i = 0, i < (ret.nodes_size), i = i + 1)
 		{
 			json_data_verbose_print(deref(ret.nodes # i), 0);
