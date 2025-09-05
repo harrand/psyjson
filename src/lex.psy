@@ -822,3 +822,8 @@ json_lex ::= func(name : u8?, src : u8?, len : u64, verbose_json_lex : bool, a :
 	}
 	return ret;
 };
+
+json_child ::= func(j : json_data, idx : u64 -> json_data?)
+{
+	return ((j.children)@json_data?)#idx;
+};

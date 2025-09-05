@@ -45,6 +45,12 @@ json_data_add_child ::= func(n : json_data mut?, c : json_data, a : arena mut? -
 	return ptr;
 };
 
+json_data_get_child ::= func(n : json_data, idx : u64 -> json_data mut?)
+{
+	cptr ::= (n.children)@json_data mut?;
+	return cptr#idx;
+};
+
 json_data_verbose_print ::= func(j : json_data, tabcount : u64 -> v0)
 {
 	i : u64 mut;

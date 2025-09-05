@@ -107,6 +107,109 @@ json_print ::= func(j : json_data -> v0)
 	json_data_verbose_print(j, 0);
 };
 
+json_array_length ::= func(j : json_data -> u64)
+{
+	static if(_config == "debug")
+	{
+		if(j.type != (json_data_type.array))
+		{
+			putzstr("json_array_length called on ");
+			putchar('"');
+			putzstr(__enumname(j.type));
+			putchar('"');
+			__debugbreak();
+		}
+	}
+	return j.childcount;
+};
+
+json_object_field_count ::= func(j : json_data -> u64)
+{
+	static if(_config == "debug")
+	{
+		if(j.type != (json_data_type.object))
+		{
+			putzstr("json_object_field_count called on ");
+			putchar('"');
+			putzstr(__enumname(j.type));
+			putchar('"');
+			__debugbreak();
+		}
+	}
+	return j.childcount;
+};
+
+// retrieve a field of an object by index. the index must be in range (see json_object_field_count)
+json_object_get_field ::= func(j : json_data, field_idx : u64 -> json_data mut?)
+{
+	static if(_config == "debug")
+	{
+		if(j.type != (json_data_type.object))
+		{
+			putzstr("json_object_get_field called on ");
+			putchar('"');
+			putzstr(__enumname(j.type));
+			putchar('"');
+			__debugbreak();
+		}
+		if(field_idx >= (j.childcount))
+		{
+			putzstr("json_object_get_field requested index ");
+			putuint(field_idx);
+			putzstr(" but object only had ");
+			putuint(j.childcount);
+			putzstr(" fields.");
+			__debugbreak();
+		}
+	}
+	return json_data_get_child(j, field_idx);
+};
+
+// retrieve a field of an object by name
+// if the object has a field by this name, its value is returned
+// else zero is returned
+json_object_find_field ::= func(j : json_data, name : u8?, name_len : u64 -> json_data mut?)
+{
+	static if(_config == "debug")
+	{
+		if(j.type != (json_data_type.object))
+		{
+			putzstr("json_object_find_field called on ");
+			putchar('"');
+			putzstr(__enumname(j.type));
+			putchar('"');
+			__debugbreak();
+		}
+	}
+	i : u64 mut;
+	for(i = 0, i < (j.childcount), i = i + 1)
+	{
+		field ::= json_data_get_child(j, i);
+		// field is a string
+		// stringdata is the name of the field
+		// its only child is the field value
+		if(field->chars_len == name_len)
+		{
+			if(streql_n(field->chars, name, name_len))
+			{
+				// this is the one
+				return json_data_get_child(deref field, 0);
+			}
+		}
+	}
+	return zero;
+};
+
+json_string_length ::= func(j : json_data -> u64)
+{
+	return j.chars_len;
+};
+
+json_string_data ::= func(j : json_data -> u8?)
+{
+	return j.chars;
+};
+
 main ::= func(iargc : s32, iargv : u8??, ienvp : u8?? -> s32)
 {
 	argc = iargc;
@@ -125,6 +228,22 @@ main ::= func(iargc : s32, iargv : u8??, ienvp : u8?? -> s32)
 	}
 	json ::= json_parse_file(args.file, global_arena);
 	json_print(json);
+
+	fieldname ::= "glossarY";
+	search ::= json_object_find_field(json, fieldname, zstrlen(fieldname));
+	if(search == zero)
+	{
+		putzstr("field ");
+		putchar('"');
+		putzstr(fieldname);
+		putchar('"');
+		putzstr(" not found.");
+		putchar(10);
+	}
+	else
+	{
+		json_print(deref search);
+	}
 	
 	return 0;
 };
