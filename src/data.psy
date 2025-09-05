@@ -8,10 +8,18 @@ json_data_type ::= enum
 	.object := 5;
 };
 
+json_number_type ::= enum
+{
+	.integral := 0;
+	.floating_point := 1;
+};
+
 json_data ::= struct
 {
 	type : json_data_type;
-	number : u64;
+	is_floating_point : bool;
+	integral : s64;
+	floating_point : f64;
 	boolean : bool;
 	chars : u8?;
 	chars_len : u64;

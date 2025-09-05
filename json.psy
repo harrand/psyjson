@@ -202,12 +202,94 @@ json_object_find_field ::= func(j : json_data, name : u8?, name_len : u64 -> jso
 
 json_string_length ::= func(j : json_data -> u64)
 {
+	static if(_config == "debug")
+	{
+		if(j.type != (json_data_type.string_literal))
+		{
+			putzstr("json_string_length called on ");
+			putchar('"');
+			putzstr(__enumname(j.type));
+			putchar('"');
+			__debugbreak();
+		}
+	}
 	return j.chars_len;
 };
 
 json_string_data ::= func(j : json_data -> u8?)
 {
+	static if(_config == "debug")
+	{
+		if(j.type != (json_data_type.string_literal))
+		{
+			putzstr("json_string_data called on ");
+			putchar('"');
+			putzstr(__enumname(j.type));
+			putchar('"');
+			__debugbreak();
+		}
+	}
 	return j.chars;
+};
+
+json_number_get_type ::= func(j : json_data -> s64)
+{
+	static if(_config == "debug")
+	{
+		if(j.type != (json_data_type.numeric_literal))
+		{
+			putzstr("json_number_get_type called on ");
+			putchar('"');
+			putzstr(__enumname(j.type));
+			putchar('"');
+			__debugbreak();
+		}
+	}
+	if(j.is_floating_point)
+	{
+		return json_number_type.floating_point;
+	}
+	return json_number_type.integral;
+};
+
+json_number_get_int ::= func(j : json_data -> s64)
+{
+	static if(_config == "debug")
+	{
+		if(j.type != (json_data_type.numeric_literal))
+		{
+			putzstr("json_number_get_int called on ");
+			putchar('"');
+			putzstr(__enumname(j.type));
+			putchar('"');
+			__debugbreak();
+		}
+	}
+	if(j.is_floating_point)
+	{
+		return j.floating_point@s64;
+	}
+	return j.integral;
+};
+
+json_number_get_float ::= func(j : json_data -> f64)
+{
+	static if(_config == "debug")
+	{
+		if(j.type != (json_data_type.numeric_literal))
+		{
+			putzstr("json_number_get_float called on ");
+			putchar('"');
+			putzstr(__enumname(j.type));
+			putchar('"');
+			__debugbreak();
+		}
+	}
+	if(j.is_floating_point)
+	{
+		return j.floating_point;
+	}
+	return j.integral@f64;
 };
 
 main ::= func(iargc : s32, iargv : u8??, ienvp : u8?? -> s32)
@@ -229,7 +311,7 @@ main ::= func(iargc : s32, iargv : u8??, ienvp : u8?? -> s32)
 	json ::= json_parse_file(args.file, global_arena);
 	json_print(json);
 
-	fieldname ::= "glossarY";
+	fieldname ::= "glossary";
 	search ::= json_object_find_field(json, fieldname, zstrlen(fieldname));
 	if(search == zero)
 	{
