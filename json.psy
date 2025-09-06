@@ -290,3 +290,20 @@ json_number_get_float ::= func(j : json_data -> f64)
 	}
 	return j.integral@f64;
 };
+
+json_validate ::= func(j : json_data, assert : bool -> bool)
+{
+	if(j.type != (json_data_type.error))
+	{
+		return true;
+	}
+	putbytes(j.chars, j.chars_len);
+	putzstr(" ");
+	putloc(j.loc);
+	putchar(10);
+	if(assert)
+	{
+		__debugbreak();
+	}
+	return false;
+};
