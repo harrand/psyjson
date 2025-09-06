@@ -232,6 +232,7 @@ json_string_data ::= func(j : json_data -> u8?)
 	return j.chars;
 };
 
+// retrieves the specific type of a number (i.e floating point or integer)
 json_number_get_type ::= func(j : json_data -> s64)
 {
 	static if(_config == "debug")
@@ -252,7 +253,8 @@ json_number_get_type ::= func(j : json_data -> s64)
 	return json_number_type.integral;
 };
 
-json_number_get_int ::= func(j : json_data -> s64)
+// get a number value as a signed 64 bit integer. works for any number
+json_number_get_integer ::= func(j : json_data -> s64)
 {
 	static if(_config == "debug")
 	{
@@ -272,6 +274,7 @@ json_number_get_int ::= func(j : json_data -> s64)
 	return j.integral;
 };
 
+// get a number value as a 64 bit floating point value. works for any number
 json_number_get_float ::= func(j : json_data -> f64)
 {
 	static if(_config == "debug")
