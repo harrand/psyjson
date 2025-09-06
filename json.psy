@@ -76,10 +76,6 @@ fully_read_file ::= func(path : u8?, a : arena mut? -> u8 mut?)
 	return data;
 };
 
-argc : s32 mut;
-argv : u8?? mut;
-envp : u8?? mut;
-
 json_parse_buffer_named ::= func(name : u8?, buf : u8?, len : u64, a : arena mut? -> json_data)
 {
 	tokens ::= json_lex(name, buf, len, false, a);
