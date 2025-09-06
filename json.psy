@@ -45,7 +45,7 @@ destroy_arenas ::= func( -> v0)
 	arena_destroy(ref frame_arena_val);
 };
 
-fully_read_file ::= func(path : u8?, a : arena mut? -> u8 mut?)
+impl_json_fully_read_file ::= func(path : u8?, a : arena mut? -> u8 mut?)
 {
 	if(!file_exists(path))
 	{
@@ -89,7 +89,7 @@ json_parse_buffer ::= func(buf : u8?, len : u64, a : arena mut? -> json_data)
 
 json_parse_file ::= func(path : u8?, a : arena mut? -> json_data)
 {
-	source ::= fully_read_file(path, a);
+	source ::= impl_json_fully_read_file(path, a);
 	return json_parse_buffer_named(path, source, zstrlen(source), a);
 };
 
