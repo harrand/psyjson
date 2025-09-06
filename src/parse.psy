@@ -116,13 +116,13 @@ json_parse_one ::= func(l : json_lex_state, s : json_parse_state mut?, a : arena
 			if(stashed->type == json_data_type.array)
 			{
 				// no concept of last_string here, just add it
-				json_data_add_child(stashed, str, global_arena);		
+				json_data_add_child(stashed, str, a);		
 			}
 			else
 			{
 				if(stashed->type == json_data_type.string_literal)
 				{
-					json_data_add_child(stashed, str, global_arena);		
+					json_data_add_child(stashed, str, a);		
 				}
 				else
 				{

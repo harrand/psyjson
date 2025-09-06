@@ -20,31 +20,6 @@
 	set_object("json");
 }
 
-global_arena_val : arena mut;
-global_arena : arena mut? mut;
-
-frame_arena_val : arena mut;
-frame_arena : arena mut? mut;
-
-setup_arenas ::= func( -> v0)
-{
-	global_arena_val = arena_create(4096 * 1024);
-	global_arena = ref global_arena_val;
-
-	frame_arena_val = arena_create(4096 * 1024);
-	frame_arena = ref frame_arena_val;
-};
-
-destroy_arenas ::= func( -> v0)
-{
-	putzstr("arena free: ");
-	putuint(global_arena_val.cur);
-	putzstr("B");
-	putchar(10);
-	arena_destroy(ref global_arena_val);
-	arena_destroy(ref frame_arena_val);
-};
-
 impl_json_fully_read_file ::= func(path : u8?, a : arena mut? -> u8 mut?)
 {
 	if(!file_exists(path))
@@ -56,7 +31,7 @@ impl_json_fully_read_file ::= func(path : u8?, a : arena mut? -> u8 mut?)
 		putzstr(" could not be located (cwd: ");
 		cwd : u8? mut;
 		cwdlen : u64 mut;
-		directory_get_cwd(ref cwd, ref cwdlen, global_arena);
+		directory_get_cwd(ref cwd, ref cwdlen, a);
 		putbytes(cwd, cwdlen);
 		putzstr(")");
 		__debugbreak();
@@ -79,7 +54,7 @@ impl_json_fully_read_file ::= func(path : u8?, a : arena mut? -> u8 mut?)
 json_parse_buffer_named ::= func(name : u8?, buf : u8?, len : u64, a : arena mut? -> json_data)
 {
 	tokens ::= json_lex(name, buf, len, false, a);
-	return json_do_parse(tokens, global_arena, false);
+	return json_do_parse(tokens, a, false);
 };
 
 json_parse_buffer ::= func(buf : u8?, len : u64, a : arena mut? -> json_data)
