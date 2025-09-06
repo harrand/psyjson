@@ -608,7 +608,7 @@ json_lex_install ::= func(t : json_lex_token, front_identifier : u8?, break : js
 		ent = ((tbl->tbl) # last);
 		if((ent->tag) == (json_lex_entry_tag.success))
 		{
-			putzstr(".success entry for json_lex_token.");
+			putzstr("fatal json lexer error: .success entry for json_lex_token.");
 			putzstr(__enumname(t));
 			putzstr(" steps on the .success entry for json_lex_token.");
 			putzstr(__enumname((ent->data)@json_lex_token));
@@ -689,7 +689,7 @@ ls_push_token ::= func(state : json_lex_state mut?, token : token_data, a : aren
 {
 	if((state->tokens) == zero)
 	{
-		putzstr("json_lex_state did not initialise its token list correctly. it was zero.");
+		putzstr("fatal json lexer error: json_lex_state did not initialise its token list correctly. it was zero.");
 		__debugbreak();
 	}
 	if((state->tokens_size) >= (state->tokens_cap))

@@ -6,6 +6,7 @@ json_data_type ::= enum
 	.null_literal := 3;
 	.array := 4;
 	.object := 5;
+	.error := 6;
 };
 
 json_number_type ::= enum

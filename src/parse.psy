@@ -4,10 +4,12 @@ json_parse_state ::= struct
 	nodes_size : u64;
 	nodes_cap : u64;
 	internal : internal_json_parse_state mut;
+	err_flag : bool;
 };
 
 internal_json_parse_state ::= struct
 {
+	parent : v0? weak;
 	stash : json_data mut?;
 	stash_size : u64;
 	stash_cap : u64;
@@ -19,11 +21,6 @@ internal_json_parse_state ::= struct
 
 stash_pop ::= func(i : internal_json_parse_state mut? -> json_data)
 {
-	if(i->stash_size == 0)
-	{
-		putzstr("stash_pop on empty stash");
-		__debugbreak();
-	}
 	stashlast ::= deref(i->stash # ((i->stash_size) - 1));
 	i->stash_size = ((i->stash_size) - 1);
 	return stashlast;
@@ -31,11 +28,6 @@ stash_pop ::= func(i : internal_json_parse_state mut? -> json_data)
 
 stash_peek ::= func(i : internal_json_parse_state? -> json_data mut?)
 {
-	if(i->stash_size == 0)
-	{
-		putzstr("stash_peek on empty stash");
-		__debugbreak();
-	}
 	return i->stash # ((i->stash_size) - 1);
 };
 
@@ -77,6 +69,27 @@ json_parse_push ::= func(s : json_parse_state mut?, j : json_data, a : arena mut
 	s->nodes_size = (s->nodes_size) + 1;
 };
 
+json_parse_error ::= func(s : json_parse_state mut? weak, errmsg : u8?, loc : srcloc, a : arena mut? -> v0)
+{
+	if(s->nodes_cap == 0)
+	{
+		s->nodes_cap = 1;
+		s->nodes = arena_alloc(a, __sizeof(json_data));
+	}
+	deref((s->nodes)) = json_data
+	{
+		.type := json_data_type.error;
+		.chars := errmsg;
+		.chars_len := zstrlen(errmsg);
+		.children := zero;
+		.childcap := zero;
+		.childcount := zero;
+		.loc := loc;
+	};
+	s->nodes_size = 1;
+	s->err_flag = true;
+};
+
 json_parse_one ::= func(l : json_lex_state, s : json_parse_state mut?, a : arena mut? -> v0)
 {
 	i ::= ref(s->internal);
@@ -97,22 +110,25 @@ json_parse_one ::= func(l : json_lex_state, s : json_parse_state mut?, a : arena
 		// peek at the stash
 		// if the top is a string literal
 		// then we are a string value not a key
-		stashed ::= stash_peek(i);
-		if(stashed->type == json_data_type.array)
+		if(i->stash_size > 0)
 		{
-			// no concept of last_string here, just add it
-			json_data_add_child(stashed, str, global_arena);		
-		}
-		else
-		{
-			if(stashed->type == json_data_type.string_literal)
+			stashed ::= stash_peek(i);
+			if(stashed->type == json_data_type.array)
 			{
+				// no concept of last_string here, just add it
 				json_data_add_child(stashed, str, global_arena);		
 			}
 			else
 			{
-				i->last_string = str;
-				i->has_last_string = true;
+				if(stashed->type == json_data_type.string_literal)
+				{
+					json_data_add_child(stashed, str, global_arena);		
+				}
+				else
+				{
+					i->last_string = str;
+					i->has_last_string = true;
+				}
 			}
 		}
 	}
@@ -120,6 +136,11 @@ json_parse_one ::= func(l : json_lex_state, s : json_parse_state mut?, a : arena
 	{
 		// if top of stash is an array
 		// ignore it
+		if(i->stash_size == 0)
+		{
+			json_parse_error(i->parent, "syntax error: invalid comma.", token.begin, a);
+			return;
+		}
 		if(stash_peek(i)->type != json_data_type.array)
 		{
 			// end of a thing.
@@ -142,9 +163,8 @@ json_parse_one ::= func(l : json_lex_state, s : json_parse_state mut?, a : arena
 	{
 		if(!(i->has_last_string))
 		{
-			putzstr("colon must directly proceed a string literal ");
-			putloc(token.begin);
-			__debugbreak();
+			json_parse_error(i->parent, "syntax error: colon does not directly proceed a string literal.", token.begin, a);
+			return;
 		}
 		stash_push(i, i->last_string, a);
 		i->has_last_string = false;
@@ -177,11 +197,8 @@ json_parse_one ::= func(l : json_lex_state, s : json_parse_state mut?, a : arena
 		obj ::= stash_pop(i);
 		if(obj.type != json_data_type.object)
 		{
-			putzstr("at cbrace expected thing at end of stash to be an object, but it is a ");
-			putzstr(__enumname(obj.type));
-			putzstr(" ");
-			putloc(obj.loc);
-			__debugbreak();
+			json_parse_error(i->parent, "syntax error: invalid closing brace - stashtop is not an object", token.begin, a);
+			return;
 		}
 		// if the stash is now empty then we have a top-level object. just add it to json_parse_state.nodes
 		// if stash is not empty then this is a subobject. add it as a child to that instead.
@@ -204,7 +221,11 @@ json_parse_one ::= func(l : json_lex_state, s : json_parse_state mut?, a : arena
 			.childcount := zero;
 			.loc := token.begin;
 		};
-		json_interpret_numeric_literal(ref num, l.src # (token.json_lexeme.off), token.json_lexeme.len);
+		if(!json_interpret_numeric_literal(ref num, l.src # (token.json_lexeme.off), token.json_lexeme.len))
+		{
+			json_parse_error(i->parent, "syntax error: failed to parse numeric literal", token.begin, a);
+			return;
+		}
 		if(i->stash_size == 0)
 		{
 			json_parse_push(s, num, a);
@@ -241,11 +262,8 @@ json_parse_one ::= func(l : json_lex_state, s : json_parse_state mut?, a : arena
 		arr ::= stash_pop(i);
 		if(arr.type != json_data_type.array)
 		{
-			putzstr("at cbrack expected thing at end of stash to be an array, but it is a ");
-			putzstr(__enumname(arr.type));
-			putzstr(" ");
-			putloc(arr.loc);
-			__debugbreak();
+			json_parse_error(i->parent, "syntax error: invalid closing bracket - stashtop is not an array", token.begin, a);
+			return;
 		}
 		// if the stash is now empty then we have a top-level array. just add it to json_parse_state.nodes
 		if(i->stash_size == 0)
@@ -324,6 +342,7 @@ json_do_parse ::= func(l : json_lex_state, a : arena mut?, verbose_parse : bool 
 	i : u64 mut;
 
 	ret ::= zero@json_parse_state mut;
+	ret.internal.parent = (ref ret);
 	while(ret.internal.lex_cursor < (l.tokens_size))
 	{
 		json_parse_one(l, ref ret, a);
@@ -337,8 +356,7 @@ json_do_parse ::= func(l : json_lex_state, a : arena mut?, verbose_parse : bool 
 	}
 	if(ret.nodes_size > 1)
 	{
-		putzstr("more than one top-level value in a single .json is not allowed");
-		__debugbreak();
+		json_parse_error(ref ret, "syntax error: more than one top-level value in json document", zero, a);
 	}
 	return deref(ret.nodes);
 };
@@ -348,8 +366,8 @@ isdigit ::= func(c : u8 -> bool)
 	return (c >= '0') && (c <= '9');
 };
 
-// return true if floating point
-json_interpret_numeric_literal ::= func(j : json_data mut?, src : u8?, len : u64 -> v0)
+// return false if error occurred
+json_interpret_numeric_literal ::= func(j : json_data mut?, src : u8?, len : u64 -> bool)
 {
 	src_begin : u8? mut := src;
 	begin_cpy ::= src_begin;
@@ -418,10 +436,7 @@ json_interpret_numeric_literal ::= func(j : json_data mut?, src : u8?, len : u64
 
 		if(digit_val >= base)
 		{
-			putchar(ch);
-			putuint(digit_val);
-			putzstr("something went super wrong when parsing integral");
-			__debugbreak();
+			return false;
 		}
 
 		if(is_integral)
@@ -450,4 +465,5 @@ json_interpret_numeric_literal ::= func(j : json_data mut?, src : u8?, len : u64
 		j->floating_point = fval;
 		j->is_floating_point = true;
 	}
+	return true;
 };
