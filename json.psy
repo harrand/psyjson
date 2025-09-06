@@ -1,19 +1,15 @@
 == default ==
 {
-	warning("No build config specified. Defaulting to debug...");
 	debug();
 }
 
 == debug ==
 {
-	debug_symbols(true);
-	set_optimization(0);
 	base();
 }
 
 == release ==
 {
-	set_optimization(3);
 	base();
 }
 
@@ -21,8 +17,7 @@
 {
 	add_source_directory("src");
 	add_build_file("psystdlib/stdlib.psy", "default");
-
-	set_executable("json");
+	set_object("json");
 }
 
 global_arena_val : arena mut;
@@ -93,7 +88,7 @@ json_parse_buffer_named ::= func(name : u8?, buf : u8?, len : u64, a : arena mut
 
 json_parse_buffer ::= func(buf : u8?, len : u64, a : arena mut? -> json_data)
 {
-	return json_parse_buffer_named("<untitled>", buf, len, a);
+	return json_parse_buffer_named("<untitled json buffer>", buf, len, a);
 };
 
 json_parse_file ::= func(path : u8?, a : arena mut? -> json_data)
@@ -200,6 +195,11 @@ json_object_find_field ::= func(j : json_data, name : u8?, name_len : u64 -> jso
 	return zero;
 };
 
+json_object_find_fieldz ::= func(j : json_data, name_zstr : u8? -> json_data mut?)
+{
+	return json_object_find_field(j, name_zstr, zstrlen(name_zstr));
+};
+
 json_string_length ::= func(j : json_data -> u64)
 {
 	static if(_config == "debug")
@@ -293,42 +293,4 @@ json_number_get_float ::= func(j : json_data -> f64)
 		return j.floating_point;
 	}
 	return j.integral@f64;
-};
-
-main ::= func(iargc : s32, iargv : u8??, ienvp : u8?? -> s32)
-{
-	argc = iargc;
-	argv = iargv;
-	envp = ienvp;
-	setup_arenas();
-	defer destroy_arenas();
-	json_lex_setup(global_arena);
-
-	args ::= json_parse_args(global_arena);
-	if(args.file == zero)
-	{
-		putzstr("error: no file provided");
-		putchar(10);
-		__debugbreak();
-	}
-	json ::= json_parse_file(args.file, global_arena);
-	json_print(json);
-
-	fieldname ::= "glossary";
-	search ::= json_object_find_field(json, fieldname, zstrlen(fieldname));
-	if(search == zero)
-	{
-		putzstr("field ");
-		putchar('"');
-		putzstr(fieldname);
-		putchar('"');
-		putzstr(" not found.");
-		putchar(10);
-	}
-	else
-	{
-		json_print(deref search);
-	}
-	
-	return 0;
 };
