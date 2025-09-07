@@ -89,6 +89,31 @@ json_array_length ::= func(j : json_data -> u64)
 	return j.childcount;
 };
 
+json_array_get_element ::= func(j : json_data, idx : u64 -> json_data mut?)
+{
+	static if(_config == "debug")
+	{
+		if(j.type != (json_data_type.array))
+		{
+			putzstr("json_array_get_element called on ");
+			putchar('"');
+			putzstr(__enumname(j.type));
+			putchar('"');
+			__debugbreak();
+		}
+		if(idx >= (j.childcount))
+		{
+			putzstr("json_array_get_element requested index ");
+			putuint(idx);
+			putzstr(" but array only had ");
+			putuint(j.childcount);
+			putzstr(" elements.");
+			__debugbreak();
+		}
+	}
+	return json_data_get_child(j, idx);
+};
+
 json_object_field_count ::= func(j : json_data -> u64)
 {
 	static if(_config == "debug")
