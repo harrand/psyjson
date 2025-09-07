@@ -408,7 +408,10 @@ json_interpret_numeric_literal ::= func(j : json_data mut?, src : u8?, len : u64
 	frac_div : f64 mut := 1.0;
 
 	is_integral : bool mut := true;
-	while(i < len)
+	has_exponent : bool mut := false;
+	exponent : s64 mut := 0;
+	exponent_negative : bool mut := false;
+	while(i < len && (!has_exponent))
 	{
 		ch = deref(begin_cpy # i);
 		if(ch == '.')
@@ -419,18 +422,29 @@ json_interpret_numeric_literal ::= func(j : json_data mut?, src : u8?, len : u64
 		{
 			digit_val = (ch - '0')@_;
 		}
-		if(ch >= 'a')
+		if(base == 16)
 		{
-			if(ch <= 'f')
+			if(ch >= 'a')
 			{
-				digit_val = (10 + (ch - 'a'));
+				if(ch <= 'f')
+				{
+					digit_val = (10 + (ch - 'a'));
+				}
+			}
+			if(ch >= 'A')
+			{
+				if(ch <= 'F')
+				{
+					digit_val = (10 + (ch - 'A'));
+				}
 			}
 		}
-		if(ch >= 'A')
+		else
 		{
-			if(ch <= 'F')
+			if(ch == 'e' || (ch == 'E'))
 			{
-				digit_val = (10 + (ch - 'A'));
+				// exponent specifier
+				has_exponent = true;
 			}
 		}
 
@@ -464,6 +478,68 @@ json_interpret_numeric_literal ::= func(j : json_data mut?, src : u8?, len : u64
 	{
 		j->floating_point = fval;
 		j->is_floating_point = true;
+	}
+	if(has_exponent)
+	{
+		// we stopped as soon as we hit an 'E' or 'e'. i points to the first digit of the exponent integer
+		while(i < len)
+		{
+			exp_ch ::= deref(begin_cpy # i);
+			if(isdigit(exp_ch))
+			{
+				exp_digit_val ::= (exp_ch - '0')@_;
+				exponent = ((exponent * 10) + exp_digit_val);
+			}
+			else
+			{
+				if(exp_ch == '-')
+				{
+					exponent_negative = (!exponent_negative);
+				}
+				else
+				{
+					if(exp_ch != '+')
+					{
+						putzstr("exponent of numeric literal is not a valid base-10 numeral: ");
+						putchar(exp_ch);
+						putchar(10);
+						__debugbreak();
+					}
+				}
+			}
+			i = i + 1;
+		}
+		k : s64 mut;
+		if(is_integral)
+		{
+			// do the exponentiation on the integral
+			for(k = 0, k < exponent, k = k + 1)
+			{
+				if(exponent_negative)
+				{
+					(j->integral) = ((j->integral) / 10);
+				}
+				else
+				{
+					(j->integral) = ((j->integral) * 10);
+				}
+			}
+		}
+		else
+		{
+			// do it on the floating point
+			for(k = 0, k < exponent, k = k + 1)
+			{
+				if(exponent_negative)
+				{
+					(j->floating_point) = ((j->floating_point) / 10.0);
+				}
+				else
+				{
+					(j->floating_point) = ((j->floating_point) * 10.0);
+				}
+			}
+		}
 	}
 	return true;
 };

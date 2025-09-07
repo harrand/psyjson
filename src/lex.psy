@@ -111,6 +111,7 @@ json_lex_table ::= struct
 main_table : json_lex_table mut;
 string_literal_table : json_lex_table mut;
 decimal_table : json_lex_table mut;
+exponent_table : json_lex_table mut;
 char0_pretable : json_lex_table mut;
 hex_table : json_lex_table mut;
 binary_table : json_lex_table mut;
@@ -245,6 +246,13 @@ decimal_table_setup ::= func( -> v0)
 		.metadata := zero;
 		.next := (ref decimal_table)@v0?;
 	};
+	deref((main_table.tbl) # '-') = json_lex_entry
+	{
+		.tag := json_lex_entry_tag.none;
+		.data := zero;
+		.metadata := zero;
+		.next := (ref decimal_table)@v0?;
+	};
 	// or its directly followed by 'x' in which case we pivot the hex table
 	deref((char0_pretable.tbl) # 120) = json_lex_entry
 	{
@@ -312,6 +320,78 @@ decimal_table_setup ::= func( -> v0)
 		.data := zero;
 		.metadata := zero;
 		.next := (ref decimal_table)@v0?;
+	};
+
+	// exponents
+	deref((decimal_table.tbl) # 'e') = json_lex_entry
+	{
+		.tag := json_lex_entry_tag.none;
+		.data := zero;
+		.metadata := zero;
+		.next := (ref exponent_table)@v0?;
+	};
+	deref((decimal_table.tbl) # 'E') = json_lex_entry
+	{
+		.tag := json_lex_entry_tag.none;
+		.data := zero;
+		.metadata := zero;
+		.next := (ref exponent_table)@v0?;
+	};
+};
+
+exponent_table_setup ::= func( -> v0)
+{
+	// we are partway through a number and have encountered an 'e' or an 'E'
+	// this covers something like 1.25e-5, 1.25e5 and 1.25e+5
+	// so: + - and any number will cycle back to ourselves
+	// punctuation or whitespace ends successfully
+	i : u64 mut;
+	for(i = 0, i < 255, i = i + 1)
+	{
+		if(impl_json_is_whitespace(i@u8))
+		{
+			deref((exponent_table.tbl) # i) = json_lex_entry
+			{
+				.tag := json_lex_entry_tag.success;
+				.data := (json_lex_token.numeric_literal)@s64@u64;
+				.metadata := true;
+				.next := zero;
+			};
+		}
+		if(impl_json_is_punctuation(i@u8))
+		{
+			deref((exponent_table.tbl) # i) = json_lex_entry
+			{
+				.tag := json_lex_entry_tag.success;
+				.data := (json_lex_token.numeric_literal)@s64@u64;
+				.metadata := true;
+				.next := zero;
+			};
+		}
+	}
+	for(i = '0', i <= '9', i = i + 1)
+	{
+		deref((exponent_table.tbl) # i) = json_lex_entry
+		{
+			.tag := json_lex_entry_tag.none;
+			.data := zero;
+			.metadata := zero;
+			.next := (ref exponent_table)@v0?;
+		};
+	}
+	deref((exponent_table.tbl) # '+') = json_lex_entry
+	{
+		.tag := json_lex_entry_tag.none;
+		.data := zero;
+		.metadata := zero;
+		.next := (ref exponent_table)@v0?;
+	};
+	deref((exponent_table.tbl) # '-') = json_lex_entry
+	{
+		.tag := json_lex_entry_tag.none;
+		.data := zero;
+		.metadata := zero;
+		.next := (ref exponent_table)@v0?;
 	};
 };
 
@@ -653,6 +733,7 @@ json_lex_setup ::= func(a : arena mut? -> v0)
 	main_table_setup(ref main_table);
 	string_table_setup();
 	decimal_table_setup();
+	exponent_table_setup();
 	hex_table_setup();
 	binary_table_setup();
 
