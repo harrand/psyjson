@@ -645,8 +645,11 @@ json_lex_install ::= func(t : json_lex_token, front_identifier : u8?, break : js
 	}
 };
 
+json_lex_is_setup : bool mut := false;
+
 json_lex_setup ::= func(a : arena mut? -> v0)
 {
+	json_lex_is_setup = true;
 	main_table_setup(ref main_table);
 	string_table_setup();
 	decimal_table_setup();
@@ -759,6 +762,8 @@ json_lex_next ::= func(s : json_lex_state mut?, a : arena mut? -> v0)
 		cur ::= (s->cursor) + 1;
 		putbytes(ptr, cur - (internal->begin_cursor));
 		putchar('"');
+		putzstr(" ");
+		putloc(ls_current_loc(s));
 		__debugbreak();
 		return;
 	}
@@ -803,6 +808,10 @@ json_lex_next ::= func(s : json_lex_state mut?, a : arena mut? -> v0)
 
 json_lex ::= func(name : u8?, src : u8?, len : u64, verbose_json_lex : bool, a : arena mut? -> json_lex_state)
 {
+	if(!json_lex_is_setup)
+	{
+		json_lex_setup(a);
+	}
 	ret : json_lex_state mut := zero;
 	(ret.line) = 1;
 	(ret.col) = 1;
