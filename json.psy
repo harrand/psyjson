@@ -16,8 +16,6 @@
 == base ==
 {
 	add_source_directory("src");
-	add_build_file("psystdlib/stdlib.psy", "default");
-	set_object("json");
 }
 
 impl_json_fully_read_file ::= func(path : u8?, a : arena mut? -> u8 mut?)
