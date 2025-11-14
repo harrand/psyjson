@@ -416,6 +416,7 @@ json_interpret_numeric_literal ::= func(j : json_data mut?, src : u8?, len : u64
 		ch = deref(begin_cpy # i);
 		if(ch == '.')
 		{
+			fval = (ival@f64);
 			is_integral = false;
 		}
 		if(isdigit(ch))
