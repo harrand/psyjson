@@ -541,5 +541,7 @@ json_interpret_numeric_literal ::= func(j : json_data mut?, src : u8?, len : u64
 			}
 		}
 	}
+	(j->floating_point) = (j->floating_point * (sign@f64));
+	(j->integral) = (j->integral * sign);
 	return true;
 };
